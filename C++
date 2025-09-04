@@ -1,0 +1,81 @@
+#include <iostream>
+#include <vector>
+#include <iomanip>
+using namespace std;
+
+struct Order {
+    int id;
+    string customer;
+    int quantity;
+    float price;
+};
+
+
+vector<Order> orders = {
+    {101, "Thabo", 3, 15.75},
+    {102, "Lerato", 5, 30.50},
+    {103, "Nomvula", 2, 10.00},
+    {104, "Sipho", 4, 22.00},
+    {105, "Bongani", 6, 40.25},
+    {106, "Lindiwe", 1, 5.50},
+    {107, "Jabulani", 3, 18.00},
+    {108, "Ayanda", 2, 12.17},
+    {109, "Kgosi", 6, 28.00},
+    {110, "Refilwe", 4, 24.50}
+};
+
+void addOrder() {
+    Order newOrder;
+    cout << "Enter Order ID: ";  "Enter Customer Name: "; "Enter Quantity: ";  "Enter Price per Unit: "; "Order added successfully.\n";
+    cin >> newOrder.id; newOrder.customer; newOrder.quantity; newOrder.price;
+ 
+    orders.push_back(newOrder);
+   
+
+void displayOrders() {
+    cout << left << setw(10) << "ID" << setw(15) << "Customer" << setw(10)
+         << "Quantity" << setw(10) << "Price" << endl;
+    for (const auto& order : orders) {
+        cout << left << setw(10) << order.id << setw(15) << order.customer << setw(10) << order.quantity << setw(10) << fixed << setprecision(2)  << order.price << endl;
+    }
+}
+
+void findOrderById() {
+    int id;
+    cout << "Enter Order ID to search: ";
+    cin >> id;
+    bool found = false;
+    for (const auto& order : orders) {
+        if (order.id == id) {
+            cout << "\nOrder Found:\n"; "Customer: " << order.customer << "\n"; "Quantity: " << order.quantity << "\n"; "Price per unit: " << fixed << setprecision(2) << order.price << "\n"; "Total: " << order.quantity * order.price << "\n";
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        cout << "Order not found.\n";
+    }
+}
+
+void calculateRevenue() {
+    float total = 0;
+    for (const auto& order : orders) {
+        total += order.quantity * order.price;
+    }
+    cout << "Total Revenue: " << fixed << setprecision(2) << total << "\n";
+}
+
+int main() {
+    int choice;
+    do {
+        cout << "\n=== Order Management Menu ===\n";  "1. Add New Order\n"; "2. Display All Orders\n";  "3. Find Order by ID\n";  "4. Calculate Total Revenue\n"; "5. Exit\n";  "Enter your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1: addOrder(); break; case 2: displayOrders(); break; case 3: findOrderById(); break;   case 4: calculateRevenue(); break;  case 5: cout << "Exiting program.\n"; break;
+            default: cout << "Invalid choice. Try again.\n";
+        }
+    } while (choice != 5);
+
+    return 0;
+}
