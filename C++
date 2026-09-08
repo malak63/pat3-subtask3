@@ -1,103 +1,170 @@
-#include <iostream>
-#include <vector>
-#include <iomanip>
-using namespace std;
+from machine import Pin, ADC, PWM
+from time import sleep
 
-struct Order {
-    int id;
-    string customer;
-    int quantity;
-    float price;
-};
+# -----------------------------
+# PIN DEFINITIONS
+# -----------------------------
 
-vector<Order> orders = {
-    {101, "Thabo", 3, 15.75},
-    {102, "Lerato", 5, 30.50},
-    {103, "Nomvula", 2, 10.00},
-    {104, "Sipho", 4, 22.00},
-    {105, "Bongani", 6, 40.25},
-    {106, "Lindiwe", 1, 5.50},
-    {107, "Jabulani", 3, 18.00},
-    {108, "Ayanda", 2, 12.17},
-    {109, "Kgosi", 6, 28.00},
-    {110, "Refilwe", 4, 24.50}
-};
+# Joystick
+joystick_y = ADC(26)       # GP26 / ADC0
+joystick_button = Pin(14, Pin.IN, Pin.PULL_UP)
 
-void addOrder() {
-    Order newOrder;
-    cout << "Enter Order ID: ";
-    cin >> newOrder.id;
-    cout << "Enter Customer Name: ";
-    cin >> newOrder.customer;
-    cout << "Enter Quantity: ";
-    cin >> newOrder.quantity;
-    cout << "Enter Price per Unit: ";
-    cin >> newOrder.price;
-    
-    orders.push_back(newOrder);
-    cout << "Order added successfully.\n";
-}
+# L298N motor driver
+motor_en = PWM(Pin(15))
+motor_in1 = Pin(2, Pin.OUT)
+motor_in2 = Pin(3, Pin.OUT)
 
-void displayOrders() {
-    cout << left << setw(10) << "ID" << setw(15) << "Customer" << setw(10)
-         << "Quantity" << setw(10) << "Price" << endl;
-    for (const auto& order : orders) {
-        cout << left << setw(10) << order.id << setw(15) << order.customer 
-             << setw(10) << order.quantity << setw(10) << fixed 
-             << setprecision(2) << order.price << endl;
-    }
-}
+# Servo motor
+servo = PWM(Pin(16))
+servo.freq(50)
 
-void findOrderById() {
-    int id;
-    cout << "Enter Order ID to search: ";
-    cin >> id;
-    bool found = false;
-    for (const auto& order : orders) {
-        if (order.id == id) {
-            cout << "\nOrder Found:\n";
-            cout << "Customer: " << order.customer << "\n";
-            cout << "Quantity: " << order.quantity << "\n";
-            cout << "Price per unit: " << fixed << setprecision(2) << order.price << "\n";
-            cout << "Total: " << order.quantity * order.price << "\n";
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
-        cout << "Order not found.\n";
-    }
-}
+# Status LED
+led = Pin(17, Pin.OUT)
 
-void calculateRevenue() {
-    float total = 0;
-    for (const auto& order : orders) {
-        total += order.quantity * order.price;
-    }
-    cout << "Total Revenue: " << fixed << setprecision(2) << total << "\n";
-}
 
-int main() {
-    int choice;
-    do {
-        cout << "\n=== Order Management Menu ===\n";
-        cout << "1. Add New Order\n";
-        cout << "2. Display All Orders\n";
-        cout << "3. Find Order by ID\n";
-        cout << "4. Calculate Total Revenue\n";
-        cout << "5. Exit\n";
-        cout << "Enter your choice: ";
-        cin >> choice;
+# -----------------------------
+# INITIAL SETTINGS
+# -----------------------------
 
-        switch (choice) {
-            case 1: addOrder(); break;
-            case 2: displayOrders(); break;
-            case 3: findOrderById(); break;
-            case 4: calculateRevenue(); break;
-            case 5: cout << "Exiting program.\n"; break;
-            default: cout << "Invalid choice. Try again.\n";
-        }
-    } while (choice != 5);
+motor_en.freq(1000)
 
-    return 0;
-}
+# Motor OFF
+motor_in1.value(0)
+motor_in2.value(0)
+motor_en.duty_u16(0)
+
+# Gripper starts CLOSED
+gripper_closed = True
+
+
+# -----------------------------
+# SERVO FUNCTION
+# -----------------------------
+
+def servo_angle(angle):
+
+    # Convert angle to servo duty cycle
+    min_duty = 1500
+    max_duty = 8000
+
+    duty = int(
+        min_duty + (angle / 180) * (max_duty - min_duty)
+    )
+
+    servo.duty_u16(duty)
+
+
+# Start with gripper closed
+servo_angle(20)
+
+
+# -----------------------------
+# START-UP LED FLASH
+# -----------------------------
+
+for i in range(3):
+    led.value(1)
+    sleep(0.5)
+
+    led.value(0)
+    sleep(0.5)
+
+# LED remains ON during operation
+led.value(1)
+
+
+# -----------------------------
+# GRIPPER CONTROL
+# -----------------------------
+
+last_button = 1
+
+def check_gripper():
+
+    global gripper_closed
+    global last_button
+
+    button = joystick_button.value()
+
+    # Detect button press
+    if button == 0 and last_button == 1:
+
+        if gripper_closed:
+            # Open gripper
+            servo_angle(100)
+            gripper_closed = False
+
+        else:
+            # Close gripper
+            servo_angle(20)
+            gripper_closed = True
+
+        sleep(0.3)
+
+    last_button = button
+
+
+# -----------------------------
+# MOTOR CONTROL
+# -----------------------------
+
+def control_motor():
+
+    value = joystick_y.read_u16()
+
+    # Joystick centre
+    centre = 32768
+
+    # Dead zone
+    dead_zone = 5000
+
+    difference = value - centre
+
+    # Joystick pushed forward
+    if difference > dead_zone:
+
+        speed = int(
+            (difference - dead_zone) /
+            (32767 - dead_zone) * 65535
+        )
+
+        if speed > 65535:
+            speed = 65535
+
+        motor_in1.value(1)
+        motor_in2.value(0)
+        motor_en.duty_u16(speed)
+
+    # Joystick pushed backwards
+    elif difference < -dead_zone:
+
+        speed = int(
+            (-difference - dead_zone) /
+            (32768 - dead_zone) * 65535
+        )
+
+        if speed > 65535:
+            speed = 65535
+
+        motor_in1.value(0)
+        motor_in2.value(1)
+        motor_en.duty_u16(speed)
+
+    # Joystick centred
+    else:
+
+        motor_in1.value(0)
+        motor_in2.value(0)
+        motor_en.duty_u16(0)
+
+
+# -----------------------------
+# MAIN PROGRAM
+# -----------------------------
+
+while True:
+
+    control_motor()
+    check_gripper()
+
+    sleep(0.02)
